@@ -9,7 +9,8 @@ let db = {
   products: [],
   purchases: [],
   tickets: [],
-  cooldowns: {}
+  cooldowns: {},
+  blocked_users: {} // {userId: {until: timestamp, reason: string}}
 };
 
 // Load database from file
@@ -235,6 +236,61 @@ export function getCooldown(userId) {
 export function setCooldown(userId) {
   db.cooldowns[userId] = new Date().toISOString();
   saveDB();
+}
+
+// Blocked Users
+export function blockUser(userId, hours, reason = '') {
+  const until = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+  db.blocked_users[userId] = {
+    until,
+    reason,
+    blocked_at: new Date().toISOString()
+  };
+  saveDB();
+  return { userId, until, reason };
+}
+
+export function unblockUser(userId) {
+  delete db.blocked_users[userId];
+  saveDB();
+}
+
+export function isUserBlocked(userId) {
+  const block = db.blocked_users[userId];
+  if (!block) return null;
+  
+  const now = new Date();
+  const until = new Date(block.until);
+  
+  if (now > until) {
+    // Block expired
+    delete db.blocked_users[userId];
+    saveDB();
+    return null;
+  }
+  
+  return block;
+}
+
+export function getAllBlockedUsers() {
+  const now = new Date();
+  const blocked = [];
+  
+  for (const [userId, block] of Object.entries(db.blocked_users)) {
+    const until = new Date(block.until);
+    if (now <= until) {
+      blocked.push({
+        user_id: userId,
+        ...block,
+        time_left: Math.ceil((until - now) / 1000 / 60) // minutes
+      });
+    } else {
+      delete db.blocked_users[userId];
+    }
+  }
+  
+  saveDB();
+  return blocked;
 }
 
 export default db;

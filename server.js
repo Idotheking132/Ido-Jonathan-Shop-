@@ -226,17 +226,27 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
   const username = req.session.user.username;
 
   try {
-    // Check cooldown (7 days)
+    // Check if user is blocked
+    const blockStatus = db.isUserBlocked(userId);
+    if (blockStatus) {
+      const until = new Date(blockStatus.until);
+      const timeLeft = Math.ceil((until - new Date()) / 1000 / 60); // minutes
+      return res.status(403).json({ 
+        error: `אתה חסום מהאתר. זמן שנותר: ${timeLeft} דקות. סיבה: ${blockStatus.reason || 'לא צוין'}` 
+      });
+    }
+
+    // Check cooldown (24 hours)
     const cooldown = db.getCooldown(userId);
     if (cooldown) {
       const lastPurchase = new Date(cooldown.last_purchase);
       const now = new Date();
-      const daysSince = (now - lastPurchase) / (1000 * 60 * 60 * 24);
+      const hoursSince = (now - lastPurchase) / (1000 * 60 * 60);
       
-      if (daysSince < 7) {
-        const daysLeft = Math.ceil(7 - daysSince);
+      if (hoursSince < 24) {
+        const hoursLeft = Math.ceil(24 - hoursSince);
         return res.status(429).json({ 
-          error: `עליך להמתין ${daysLeft} ימים נוספים לפני הקנייה הבאה` 
+          error: `עליך להמתין ${hoursLeft} שעות נוספות לפני הקנייה הבאה` 
         });
       }
     }
@@ -464,6 +474,48 @@ app.post('/api/admin/users/:userId/remove-cooldown', requireAdmin, (req, res) =>
     const { userId } = req.params;
     db.removeCooldown(userId);
     res.json({ success: true, message: 'Cooldown removed' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Block user
+app.post('/api/admin/users/:userId/block', requireAdmin, (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { hours, reason } = req.body;
+
+    if (!hours || hours < 1) {
+      return res.status(400).json({ error: 'Hours must be at least 1' });
+    }
+
+    const result = db.blockUser(userId, parseInt(hours), reason || '');
+    broadcastUpdate('user_blocked', result);
+    
+    res.json({ success: true, message: `User blocked for ${hours} hours`, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Unblock user
+app.post('/api/admin/users/:userId/unblock', requireAdmin, (req, res) => {
+  try {
+    const { userId } = req.params;
+    db.unblockUser(userId);
+    broadcastUpdate('user_unblocked', { userId });
+    
+    res.json({ success: true, message: 'User unblocked' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all blocked users
+app.get('/api/admin/blocked-users', requireAdmin, (req, res) => {
+  try {
+    const blocked = db.getAllBlockedUsers();
+    res.json(blocked);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

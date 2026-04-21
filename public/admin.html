@@ -268,6 +268,7 @@
             <button class="tab-btn active" onclick="showTab('products', this)">📦 מוצרים</button>
             <button class="tab-btn" onclick="showTab('purchases', this)">💳 קניות</button>
             <button class="tab-btn" onclick="showTab('tickets', this)">🎫 הזמנות</button>
+            <button class="tab-btn" onclick="showTab('blocked', this)">🚫 חסומים</button>
         </div>
 
         <div class="admin-main">
@@ -346,10 +347,61 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Blocked Users Tab -->
+            <div id="blocked-tab" class="tab-content">
+                <div class="admin-header">
+                    <h2>משתמשים חסומים</h2>
+                    <button class="btn-primary" onclick="openBlockModal()">+ חסום משתמש</button>
+                </div>
+                <div class="products-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Discord ID</th>
+                                <th>סיבה</th>
+                                <th>חסום עד</th>
+                                <th>זמן שנותר</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="blocked-tbody">
+                            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">אין משתמשים חסומים</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Product Modal -->
+    <!-- Block User Modal -->
+    <div id="block-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeBlockModal()">&times;</span>
+            <h2>חסום משתמש</h2>
+            <form id="block-form" onsubmit="blockUser(event)">
+                <div class="form-group">
+                    <label>Discord ID</label>
+                    <input type="text" id="block-user-id" required placeholder="123456789">
+                </div>
+
+                <div class="form-group">
+                    <label>שעות חסימה</label>
+                    <input type="number" id="block-hours" min="1" value="24" required>
+                </div>
+
+                <div class="form-group">
+                    <label>סיבה (אופציונלי)</label>
+                    <textarea id="block-reason" rows="3" placeholder="הערה על סיבת החסימה"></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn-primary">חסום</button>
+                    <button type="button" class="btn-secondary" onclick="closeBlockModal()">ביטול</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <div id="product-modal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeProductModal()">&times;</span>
@@ -407,6 +459,7 @@
         let products = [];
         let purchases = [];
         let tickets = [];
+        let blocked = [];
         let editingProductId = null;
         let ws = null;
 
@@ -429,6 +482,10 @@
                 
                 if (type === 'ticket_approved' || type === 'ticket_rejected' || type === 'ticket_closed') {
                     loadTickets();
+                }
+
+                if (type === 'user_blocked' || type === 'user_unblocked') {
+                    loadBlockedUsers();
                 }
             };
 
@@ -467,6 +524,16 @@
                 const response = await fetch('/api/admin/tickets');
                 tickets = await response.json();
                 displayTickets();
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function loadBlockedUsers() {
+            try {
+                const response = await fetch('/api/admin/blocked-users');
+                blocked = await response.json();
+                displayBlockedUsers();
             } catch (error) {
                 console.error(error);
             }
@@ -544,6 +611,25 @@
             `).join('');
         }
 
+        function displayBlockedUsers() {
+            const tbody = document.getElementById('blocked-tbody');
+            if (blocked.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">אין משתמשים חסומים</td></tr>';
+                return;
+            }
+            tbody.innerHTML = blocked.map(b => `
+                <tr>
+                    <td><code>${b.user_id}</code></td>
+                    <td>${b.reason || '—'}</td>
+                    <td>${new Date(b.until).toLocaleString('he-IL')}</td>
+                    <td>${b.time_left} דקות</td>
+                    <td>
+                        <button class="btn-small btn-danger" onclick="unblockUser('${b.user_id}')">בטל חסימה</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
         function showTab(tab, btn) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -551,6 +637,7 @@
             btn.classList.add('active');
             if (tab === 'purchases' && purchases.length === 0) loadPurchases();
             if (tab === 'tickets' && tickets.length === 0) loadTickets();
+            if (tab === 'blocked' && blocked.length === 0) loadBlockedUsers();
         }
 
         async function approveTicket(channelId) {
@@ -622,6 +709,55 @@
             editingProductId = null;
         }
 
+        function openBlockModal() {
+            document.getElementById('block-form').reset();
+            document.getElementById('block-modal').style.display = 'block';
+        }
+
+        function closeBlockModal() {
+            document.getElementById('block-modal').style.display = 'none';
+        }
+
+        async function blockUser(event) {
+            event.preventDefault();
+            const userId = document.getElementById('block-user-id').value;
+            const hours = document.getElementById('block-hours').value;
+            const reason = document.getElementById('block-reason').value;
+
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/block`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hours: parseInt(hours), reason })
+                });
+
+                if (response.ok) {
+                    alert(`✓ משתמש חסום ל-${hours} שעות`);
+                    closeBlockModal();
+                    loadBlockedUsers();
+                } else {
+                    alert('❌ שגיאה בחסימה');
+                }
+            } catch (error) {
+                alert('❌ שגיאה בחסימה');
+            }
+        }
+
+        async function unblockUser(userId) {
+            if (!confirm('בטל חסימה?')) return;
+            try {
+                const response = await fetch(`/api/admin/users/${userId}/unblock`, { method: 'POST' });
+                if (response.ok) {
+                    alert('✓ חסימה בוטלה');
+                    loadBlockedUsers();
+                } else {
+                    alert('❌ שגיאה');
+                }
+            } catch (error) {
+                alert('❌ שגיאה');
+            }
+        }
+
         async function saveProduct(event) {
             event.preventDefault();
             const data = {
@@ -669,6 +805,7 @@
 
         window.onclick = function(event) {
             if (event.target == document.getElementById('product-modal')) closeProductModal();
+            if (event.target == document.getElementById('block-modal')) closeBlockModal();
         }
 
         connectWebSocket();
