@@ -2,7 +2,7 @@ import express from 'express';
 import session from 'express-session';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { isUserInGuild, getUserRoles, createTicket, closeTicket, updateTicketStatus } from './bot.js';
+import { isUserInGuild, getUserRoles, createTicket, closeTicket, updateTicketStatus, isBotReady } from './bot.js';
 import * as db from './database.js';
 
 dotenv.config();
@@ -490,7 +490,7 @@ app.post('/api/bulk-order', requireAuth, async (req, res) => {
     } catch (channelError) {
       console.error('Error sending to approval channel:', channelError.message);
       console.error('Channel ID:', approvalChannelId);
-      console.error('Bot ready:', botReady);
+      console.error('Bot ready:', isBotReady());
       res.status(500).json({ error: 'Failed to send approval message: ' + channelError.message });
     }
   } catch (error) {

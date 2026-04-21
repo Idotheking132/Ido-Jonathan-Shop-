@@ -101,6 +101,10 @@ function waitForReady(timeout = 10000) {
   });
 }
 
+export function isBotReady() {
+  return botReady;
+}
+
 // Check if user is in guild
 export async function isUserInGuild(userId) {
   try {
