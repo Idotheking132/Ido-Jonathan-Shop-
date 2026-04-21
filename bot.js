@@ -72,6 +72,46 @@ client.on('interactionCreate', async (interaction) => {
 
   const customId = interaction.customId;
   
+  // Handle close ticket button
+  if (customId.startsWith('close_ticket_')) {
+    const channelId = customId.split('_')[2];
+    try {
+      await interaction.deferReply();
+      
+      const channel = await client.channels.fetch(channelId);
+      if (!channel) {
+        return interaction.editReply('❌ הערוץ לא נמצא');
+      }
+
+      // Check if user is admin
+      const member = await interaction.guild.members.fetch(interaction.user.id);
+      const isAdmin = member.roles.cache.has(process.env.ADMIN_ROLE_ID);
+
+      if (!isAdmin && interaction.user.id !== channel.topic?.split('|')[0]) {
+        return interaction.editReply('❌ רק מנהלים או בעל הטיקט יכולים לסגור');
+      }
+
+      // Update database
+      db.updateTicketStatus(channelId, 'closed');
+
+      // Send closing message
+      await interaction.editReply('✅ הטיקט נסגר');
+
+      // Delete channel after 2 seconds
+      setTimeout(async () => {
+        try {
+          await channel.delete();
+          console.log(`✓ Ticket channel closed: ${channelId}`);
+        } catch (err) {
+          console.error('Error deleting channel:', err);
+        }
+      }, 2000);
+    } catch (error) {
+      console.error('Error closing ticket:', error);
+      await interaction.editReply('❌ שגיאה בסגירת הטיקט');
+    }
+  }
+  
   if (customId.startsWith('approve_bulk_')) {
     const orderId = parseInt(customId.split('_')[2]);
     try {
@@ -85,19 +125,28 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply('❌ הזמנה לא נמצאה');
       }
 
+      console.log(`📦 Approving bulk order #${orderId} for ${bulkOrder.username}`);
+
+      // Create ticket for the user FIRST
+      let ticketChannelId;
+      try {
+        ticketChannelId = await createTicket(
+          bulkOrder.user_id,
+          bulkOrder.username,
+          `הזמנה גדולה #${orderId}`,
+          bulkOrder.items.length,
+          bulkOrder.total_price
+        );
+        console.log(`✓ Ticket created: ${ticketChannelId}`);
+      } catch (ticketErr) {
+        console.error('Error creating ticket:', ticketErr);
+        return interaction.editReply('❌ שגיאה בפתיחת הטיקט');
+      }
+
       // Update stock for all items
       for (const item of bulkOrder.items) {
         db.updateStock(item.quantity, item.productId);
       }
-
-      // Create ticket for the user
-      const ticketChannelId = await createTicket(
-        bulkOrder.user_id,
-        bulkOrder.username,
-        `הזמנה גדולה #${bulkOrder.id}`,
-        bulkOrder.items.length,
-        bulkOrder.total_price
-      );
 
       // Update bulk order status and channel
       const ticketIndex = db.db.tickets.findIndex(t => t.id === orderId);
@@ -107,25 +156,37 @@ client.on('interactionCreate', async (interaction) => {
         saveDB();
       }
 
-      // Send DM to user
+      // Send DM to user with ticket link
       try {
         const user = await client.users.fetch(bulkOrder.user_id);
+        
+        // Build items list for DM
+        const itemsList = bulkOrder.items.map(item => {
+          const product = db.getProduct(item.productId);
+          return `• ${product ? product.name : 'Unknown'} x${item.quantity}`;
+        }).join('\n');
+
         await user.send({
           embeds: [{
             title: '✅ הזמנה אושרה!',
             color: 0x38a169,
+            description: 'ההזמנה שלך אושרה בהצלחה',
             fields: [
-              { name: '🆔 מזהה הזמנה', value: bulkOrder.id.toString() },
-              { name: '💰 סה"כ', value: `₪${bulkOrder.total_price.toFixed(2)}` },
-              { name: '🎫 טיקט', value: `<#${ticketChannelId}>` },
+              { name: '🆔 מזהה הזמנה', value: `#${orderId}`, inline: true },
+              { name: '💰 סה"כ', value: `₪${bulkOrder.total_price.toFixed(2)}`, inline: true },
+              { name: '📋 פריטים', value: itemsList, inline: false },
+              { name: '🎫 טיקט', value: `<#${ticketChannelId}>`, inline: false },
             ],
+            timestamp: new Date(),
+            footer: { text: 'Ido & Jonathan Shop' },
           }],
         });
+        console.log(`✓ DM sent to ${bulkOrder.username}`);
       } catch (err) {
         console.error('Could not send DM:', err);
       }
 
-      await interaction.editReply(`✅ הזמנה #${orderId} אושרה! טיקט נוצר: <#${ticketChannelId}>`);
+      await interaction.editReply(`✅ הזמנה #${orderId} אושרה!\n🎫 טיקט: <#${ticketChannelId}>\n📧 הודעה נשלחה לקונה`);
     } catch (error) {
       console.error('Error approving bulk order:', error);
       await interaction.editReply('❌ שגיאה באישור ההזמנה');
@@ -144,6 +205,8 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.editReply('❌ הזמנה לא נמצאה');
       }
 
+      console.log(`❌ Rejecting bulk order #${orderId} for ${bulkOrder.username}`);
+
       // Update status
       const ticketIndex = db.db.tickets.findIndex(t => t.id === orderId);
       if (ticketIndex !== -1) {
@@ -158,17 +221,21 @@ client.on('interactionCreate', async (interaction) => {
           embeds: [{
             title: '❌ הזמנה דחויה',
             color: 0xe53e3e,
+            description: 'הזמנתך דחויה על ידי מנהל',
             fields: [
-              { name: '🆔 מזהה הזמנה', value: bulkOrder.id.toString() },
-              { name: '💬 הערה', value: 'ההזמנה דחויה על ידי מנהל' },
+              { name: '🆔 מזהה הזמנה', value: `#${orderId}`, inline: true },
+              { name: '💰 סה"כ', value: `₪${bulkOrder.total_price.toFixed(2)}`, inline: true },
             ],
+            timestamp: new Date(),
+            footer: { text: 'Ido & Jonathan Shop' },
           }],
         });
+        console.log(`✓ Rejection DM sent to ${bulkOrder.username}`);
       } catch (err) {
         console.error('Could not send DM:', err);
       }
 
-      await interaction.editReply(`❌ הזמנה #${orderId} דחויה`);
+      await interaction.editReply(`❌ הזמנה #${orderId} דחויה\n📧 הודעה נשלחה לקונה`);
     } catch (error) {
       console.error('Error rejecting bulk order:', error);
       await interaction.editReply('❌ שגיאה בדחיית ההזמנה');
@@ -260,23 +327,44 @@ export async function createTicket(userId, username, productName, quantity, tota
       ],
     });
 
+    // Determine if this is a bulk order or single item
+    const isBulkOrder = productName.includes('הזמנה גדולה');
+
+    const embed = {
+      title: isBulkOrder ? '📦 הזמנה גדולה חדשה' : '🛒 קנייה חדשה מהאתר',
+      color: isBulkOrder ? 0x9333ea : 0x5865F2,
+      description: isBulkOrder ? 'ההזמנה שלך אושרה בהצלחה!' : 'קנייה חדשה בהמתנה לאישור',
+      fields: [
+        { name: '👤 קונה', value: `<@${userId}>`, inline: true },
+        { name: '📦 פריטים', value: quantity.toString(), inline: true },
+        { name: '💰 סה"כ', value: `₪${totalPrice.toFixed(2)}`, inline: true },
+        { name: '📊 סטטוס', value: isBulkOrder ? '✅ אושר' : '⏳ בהמתנה לאישור', inline: false },
+      ],
+      timestamp: new Date(),
+      footer: { text: 'Ido & Jonathan Shop' },
+    };
+
+    const components = [
+      {
+        type: 1,
+        components: [
+          {
+            type: 2,
+            label: 'סגור טיקט',
+            style: 4,
+            custom_id: `close_ticket_${ticketChannel.id}`,
+          },
+        ],
+      },
+    ];
+
     await ticketChannel.send({
       content: `<@${userId}>`,
-      embeds: [{
-        title: '🛒 קנייה חדשה מהאתר',
-        color: 0x5865F2,
-        fields: [
-          { name: '👤 קונה', value: `<@${userId}>`, inline: true },
-          { name: '📦 מוצר', value: productName, inline: true },
-          { name: '🔢 כמות', value: quantity.toString(), inline: true },
-          { name: '💰 מחיר כולל', value: `₪${totalPrice.toFixed(2)}`, inline: true },
-          { name: '📊 סטטוס', value: '⏳ בהמתנה לאישור', inline: false },
-        ],
-        timestamp: new Date(),
-        footer: { text: 'Ido & Jonathan Shop' },
-      }],
+      embeds: [embed],
+      components: components,
     });
 
+    console.log(`✓ Ticket created for ${username}: ${ticketChannel.id}`);
     return ticketChannel.id;
   } catch (error) {
     console.error('Error creating ticket:', error);
