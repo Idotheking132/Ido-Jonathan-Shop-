@@ -17,10 +17,15 @@ let botReady = false;
 client.once('ready', () => {
   console.log(`✅ Discord Bot logged in as ${client.user.tag}`);
   botReady = true;
+  console.log(`Bot is ready to send messages`);
 });
 
 client.on('error', (error) => {
   console.error('Discord client error:', error);
+});
+
+client.on('warn', (warning) => {
+  console.warn('Discord client warning:', warning);
 });
 
 // Handle .siteclose command

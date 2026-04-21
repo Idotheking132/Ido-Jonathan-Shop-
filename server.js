@@ -455,6 +455,11 @@ app.post('/api/bulk-order', requireAuth, async (req, res) => {
     try {
       const channel = await client.channels.fetch(approvalChannelId);
       
+      if (!channel) {
+        console.error('Approval channel not found:', approvalChannelId);
+        return res.status(500).json({ error: 'Approval channel not found' });
+      }
+
       const itemsList = items.map(item => {
         const product = db.getProduct(item.productId);
         return `• ${product.name} x${item.quantity}`;
@@ -475,18 +480,22 @@ app.post('/api/bulk-order', requireAuth, async (req, res) => {
         }],
       });
 
+      console.log('✓ Bulk order message sent:', bulkOrder.id);
+
       res.json({ 
         success: true, 
         message: 'Bulk order sent for approval',
         orderId: bulkOrder.id
       });
     } catch (channelError) {
-      console.error('Error sending to approval channel:', channelError);
-      res.status(500).json({ error: 'Failed to send approval message' });
+      console.error('Error sending to approval channel:', channelError.message);
+      console.error('Channel ID:', approvalChannelId);
+      console.error('Bot ready:', botReady);
+      res.status(500).json({ error: 'Failed to send approval message: ' + channelError.message });
     }
   } catch (error) {
     console.error('Bulk order error:', error);
-    res.status(500).json({ error: 'Error creating bulk order' });
+    res.status(500).json({ error: 'Error creating bulk order: ' + error.message });
   }
 });
 
