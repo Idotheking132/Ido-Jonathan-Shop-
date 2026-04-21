@@ -3,6 +3,7 @@ import session from 'express-session';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import { isUserInGuild, getUserRoles, createTicket, closeTicket, updateTicketStatus, isBotReady } from './bot.js';
+import client from './bot.js';
 import * as db from './database.js';
 
 dotenv.config();
