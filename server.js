@@ -92,18 +92,20 @@ app.get('/auth/callback', async (req, res) => {
 
     const user = userResponse.data;
 
-    // Check if user is in guild
-    const inGuild = await isUserInGuild(user.id);
-    if (!inGuild) {
+    // Get user roles (this also confirms they're in the guild)
+    const roles = await getUserRoles(user.id);
+    console.log(`User ${user.username} (${user.id}) roles:`, roles);
+
+    // If roles is empty, user is not in guild or bot can't see them
+    if (roles.length === 0) {
       return res.redirect('/?error=not_in_guild');
     }
 
-    // Get user roles
-    const roles = await getUserRoles(user.id);
-    
     // Check if user has buyer or admin role
     const hasAccess = roles.includes(process.env.BUYER_ROLE_ID) || 
                       roles.includes(process.env.ADMIN_ROLE_ID);
+    
+    console.log(`hasAccess: ${hasAccess}, BUYER: ${process.env.BUYER_ROLE_ID}, ADMIN: ${process.env.ADMIN_ROLE_ID}`);
     
     if (!hasAccess) {
       return res.redirect('/?error=no_access');
