@@ -7,6 +7,7 @@ const DB_FILE = 'shop.json';
 let db = {
   products: [],
   purchases: [],
+  tickets: [],
   cooldowns: {}
 };
 
@@ -125,6 +126,56 @@ export function getAllPurchases() {
       product_name: product ? product.name : 'Unknown'
     };
   });
+}
+
+// Tickets
+export function addTicket(userId, username, productId, quantity, totalPrice, channelId) {
+  const id = db.tickets.length > 0 ? Math.max(...db.tickets.map(t => t.id)) + 1 : 1;
+  const ticket = {
+    id,
+    user_id: userId,
+    username,
+    product_id: productId,
+    quantity,
+    total_price: totalPrice,
+    channel_id: channelId,
+    status: 'pending', // pending, approved, rejected, closed
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  db.tickets.push(ticket);
+  saveDB();
+  return ticket;
+}
+
+export function getTicket(channelId) {
+  return db.tickets.find(t => t.channel_id === channelId);
+}
+
+export function getAllTickets() {
+  return db.tickets.map(ticket => {
+    const product = db.products.find(p => p.id === ticket.product_id);
+    return {
+      ...ticket,
+      product_name: product ? product.name : 'Unknown'
+    };
+  });
+}
+
+export function updateTicketStatus(channelId, status) {
+  const ticket = db.tickets.find(t => t.channel_id === channelId);
+  if (ticket) {
+    ticket.status = status;
+    ticket.updated_at = new Date().toISOString();
+    saveDB();
+    return ticket;
+  }
+  return null;
+}
+
+export function deleteTicket(channelId) {
+  db.tickets = db.tickets.filter(t => t.channel_id !== channelId);
+  saveDB();
 }
 
 // Cooldowns

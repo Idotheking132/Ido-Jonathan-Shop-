@@ -21,6 +21,7 @@
         <div class="admin-tabs">
             <button class="tab-btn active" onclick="showTab('products', this)">מוצרים</button>
             <button class="tab-btn" onclick="showTab('purchases', this)">קניות</button>
+            <button class="tab-btn" onclick="showTab('tickets', this)">ניהול הזמנות</button>
         </div>
 
         <!-- Products Tab -->
@@ -69,6 +70,31 @@
                         </tr>
                     </thead>
                     <tbody id="purchases-tbody">
+                        <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tickets Tab -->
+        <div id="tickets-tab" class="tab-content">
+            <div class="admin-header">
+                <h2>ניהול הזמנות</h2>
+            </div>
+            <div class="products-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>קונה</th>
+                            <th>מוצר</th>
+                            <th>כמות</th>
+                            <th>מחיר</th>
+                            <th>סטטוס</th>
+                            <th>פעולות</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tickets-tbody">
                         <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
                     </tbody>
                 </table>
@@ -132,6 +158,7 @@
     <script>
         let products = [];
         let purchases = [];
+        let tickets = [];
         let editingProductId = null;
 
         async function loadProducts() {
@@ -149,6 +176,16 @@
                 const response = await fetch('/api/admin/purchases');
                 purchases = await response.json();
                 displayPurchases();
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function loadTickets() {
+            try {
+                const response = await fetch('/api/admin/tickets');
+                tickets = await response.json();
+                displayTickets();
             } catch (error) {
                 console.error(error);
             }
@@ -195,12 +232,86 @@
             `).join('');
         }
 
+        function displayTickets() {
+            const tbody = document.getElementById('tickets-tbody');
+            if (tickets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">אין הזמנות</td></tr>';
+                return;
+            }
+            tbody.innerHTML = tickets.map(t => `
+                <tr>
+                    <td>${t.id}</td>
+                    <td style="color: var(--text-primary);">${t.username}</td>
+                    <td>${t.product_name}</td>
+                    <td>${t.quantity}</td>
+                    <td>₪${t.total_price.toFixed(2)}</td>
+                    <td>
+                        ${t.status === 'pending' ? '<span style="color: #f6ad55;">⏳ בהמתנה</span>' : ''}
+                        ${t.status === 'approved' ? '<span style="color: #68d391;">✅ אושר</span>' : ''}
+                        ${t.status === 'rejected' ? '<span style="color: #fc8181;">❌ דחוי</span>' : ''}
+                        ${t.status === 'closed' ? '<span style="color: #a0aec0;">🔒 סגור</span>' : ''}
+                    </td>
+                    <td>
+                        ${t.status === 'pending' ? `
+                            <button class="btn-small" onclick="approveTicket('${t.channel_id}')">אישור</button>
+                            <button class="btn-small btn-danger" onclick="rejectTicket('${t.channel_id}')">דחייה</button>
+                        ` : ''}
+                        <button class="btn-small btn-danger" onclick="closeTicketBtn('${t.channel_id}')">סגור</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
         function showTab(tab, btn) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(tab + '-tab').classList.add('active');
             btn.classList.add('active');
             if (tab === 'purchases' && purchases.length === 0) loadPurchases();
+            if (tab === 'tickets' && tickets.length === 0) loadTickets();
+        }
+
+        async function approveTicket(channelId) {
+            try {
+                const response = await fetch(`/api/admin/tickets/${channelId}/approve`, { method: 'POST' });
+                if (response.ok) {
+                    alert('✓ הזמנה אושרה');
+                    loadTickets();
+                } else {
+                    alert('❌ שגיאה');
+                }
+            } catch (error) {
+                alert('❌ שגיאה');
+            }
+        }
+
+        async function rejectTicket(channelId) {
+            try {
+                const response = await fetch(`/api/admin/tickets/${channelId}/reject`, { method: 'POST' });
+                if (response.ok) {
+                    alert('✓ הזמנה דחויה');
+                    loadTickets();
+                } else {
+                    alert('❌ שגיאה');
+                }
+            } catch (error) {
+                alert('❌ שגיאה');
+            }
+        }
+
+        async function closeTicketBtn(channelId) {
+            if (!confirm('סגור הזמנה?')) return;
+            try {
+                const response = await fetch(`/api/admin/tickets/${channelId}/close`, { method: 'POST' });
+                if (response.ok) {
+                    alert('✓ הזמנה סגורה');
+                    loadTickets();
+                } else {
+                    alert('❌ שגיאה');
+                }
+            } catch (error) {
+                alert('❌ שגיאה');
+            }
         }
 
         function openProductModal(productId = null) {

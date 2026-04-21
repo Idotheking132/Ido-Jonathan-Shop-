@@ -2,7 +2,7 @@ import express from 'express';
 import session from 'express-session';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { isUserInGuild, getUserRoles, createTicket } from './bot.js';
+import { isUserInGuild, getUserRoles, createTicket, closeTicket, updateTicketStatus } from './bot.js';
 import * as db from './database.js';
 
 dotenv.config();
@@ -126,9 +126,13 @@ app.get('/auth/callback', async (req, res) => {
 
     // Check if user has buyer or admin role
     const hasAccess = roles.includes(process.env.BUYER_ROLE_ID) || 
-                      roles.includes(process.env.ADMIN_ROLE_ID);
+                      roles.includes(process.env.ADMIN_ROLE_ID) ||
+                      roles.includes(process.env.VIP_ROLE_ID);
     
-    console.log(`hasAccess: ${hasAccess}, BUYER: ${process.env.BUYER_ROLE_ID}, ADMIN: ${process.env.ADMIN_ROLE_ID}`);
+    console.log(`hasAccess: ${hasAccess}`);
+    console.log(`BUYER: ${process.env.BUYER_ROLE_ID} = ${roles.includes(process.env.BUYER_ROLE_ID)}`);
+    console.log(`ADMIN: ${process.env.ADMIN_ROLE_ID} = ${roles.includes(process.env.ADMIN_ROLE_ID)}`);
+    console.log(`VIP: ${process.env.VIP_ROLE_ID} = ${roles.includes(process.env.VIP_ROLE_ID)}`);
     
     if (!hasAccess) {
       return res.redirect('/?error=no_access');
@@ -248,6 +252,9 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     // Add purchase record
     db.addPurchase(userId, username, productId, quantity, totalPrice, ticketChannelId);
 
+    // Add ticket record
+    db.addTicket(userId, username, productId, quantity, totalPrice, ticketChannelId);
+
     // Set cooldown
     db.setCooldown(userId);
 
@@ -329,6 +336,65 @@ app.get('/api/admin/purchases', requireAdmin, (req, res) => {
   try {
     const purchases = db.getAllPurchases();
     res.json(purchases);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Tickets API
+app.get('/api/admin/tickets', requireAdmin, (req, res) => {
+  try {
+    const tickets = db.getAllTickets();
+    res.json(tickets);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/tickets/:channelId/approve', requireAdmin, async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const ticket = db.updateTicketStatus(channelId, 'approved');
+    
+    if (ticket) {
+      await updateTicketStatus(channelId, '✅ אושר', '✅');
+      res.json({ success: true, ticket });
+    } else {
+      res.status(404).json({ error: 'Ticket not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/tickets/:channelId/reject', requireAdmin, async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const ticket = db.updateTicketStatus(channelId, 'rejected');
+    
+    if (ticket) {
+      await updateTicketStatus(channelId, '❌ דחוי', '❌');
+      res.json({ success: true, ticket });
+    } else {
+      res.status(404).json({ error: 'Ticket not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/tickets/:channelId/close', requireAdmin, async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const ticket = db.updateTicketStatus(channelId, 'closed');
+    
+    if (ticket) {
+      await closeTicket(channelId);
+      db.deleteTicket(channelId);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Ticket not found' });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -7,6 +7,8 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.MessageContent,
   ],
 });
 
@@ -19,6 +21,39 @@ client.once('ready', () => {
 
 client.on('error', (error) => {
   console.error('Discord client error:', error);
+});
+
+// Handle .siteclose command
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+  if (!message.content.startsWith('.siteclose')) return;
+
+  try {
+    // Check if user is admin
+    const member = await message.guild.members.fetch(message.author.id);
+    const isAdmin = member.roles.cache.has(process.env.ADMIN_ROLE_ID);
+
+    if (!isAdmin) {
+      return message.reply('❌ רק מנהלים יכולים לסגור טיקטים');
+    }
+
+    // Check if this is a ticket channel
+    if (!message.channel.name.startsWith('קנייה-באתר-')) {
+      return message.reply('❌ פקודה זו עובדת רק בערוצי טיקטים');
+    }
+
+    // Archive and close the channel
+    await message.channel.setArchived(true);
+    await message.reply('✅ הטיקט סגור');
+
+    // Delete after 5 seconds
+    setTimeout(() => {
+      message.channel.delete().catch(err => console.error('Error deleting channel:', err));
+    }, 5000);
+  } catch (error) {
+    console.error('Error in .siteclose command:', error);
+    message.reply('❌ שגיאה בסגירת הטיקט');
+  }
 });
 
 client.login(process.env.DISCORD_BOT_TOKEN).catch(err => {
@@ -47,7 +82,6 @@ export async function isUserInGuild(userId) {
   try {
     await waitForReady();
     const guild = await client.guilds.fetch(process.env.GUILD_ID);
-    // Force fetch member from API (not cache)
     const member = await guild.members.fetch({ user: userId, force: true });
     return !!member;
   } catch (error) {
@@ -61,7 +95,6 @@ export async function getUserRoles(userId) {
   try {
     await waitForReady();
     const guild = await client.guilds.fetch(process.env.GUILD_ID);
-    // Force fetch member from API (not cache)
     const member = await guild.members.fetch({ user: userId, force: true });
     const roles = member.roles.cache.map(role => role.id);
     console.log(`Roles for ${userId}:`, roles);
@@ -113,6 +146,7 @@ export async function createTicket(userId, username, productName, quantity, tota
           { name: '📦 מוצר', value: productName, inline: true },
           { name: '🔢 כמות', value: quantity.toString(), inline: true },
           { name: '💰 מחיר כולל', value: `₪${totalPrice.toFixed(2)}`, inline: true },
+          { name: '📊 סטטוס', value: '⏳ בהמתנה לאישור', inline: false },
         ],
         timestamp: new Date(),
         footer: { text: 'Ido & Jonathan Shop' },
@@ -123,6 +157,51 @@ export async function createTicket(userId, username, productName, quantity, tota
   } catch (error) {
     console.error('Error creating ticket:', error);
     throw error;
+  }
+}
+
+// Close ticket channel
+export async function closeTicket(channelId) {
+  try {
+    await waitForReady();
+    const channel = await client.channels.fetch(channelId);
+    if (channel) {
+      await channel.setArchived(true);
+      setTimeout(() => {
+        channel.delete().catch(err => console.error('Error deleting channel:', err));
+      }, 2000);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error closing ticket:', error);
+    return false;
+  }
+}
+
+// Update ticket status
+export async function updateTicketStatus(channelId, status, statusEmoji) {
+  try {
+    await waitForReady();
+    const channel = await client.channels.fetch(channelId);
+    if (channel) {
+      const messages = await channel.messages.fetch({ limit: 1 });
+      const message = messages.first();
+      if (message && message.embeds.length > 0) {
+        const embed = message.embeds[0];
+        const newEmbed = {
+          ...embed,
+          fields: embed.fields.map(f => 
+            f.name === '📊 סטטוס' 
+              ? { ...f, value: `${statusEmoji} ${status}` }
+              : f
+          ),
+        };
+        await message.edit({ embeds: [newEmbed] });
+      }
+    }
+  } catch (error) {
+    console.error('Error updating ticket status:', error);
   }
 }
 
