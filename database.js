@@ -40,7 +40,7 @@ function loadDB() {
 }
 
 // Save database to file
-function saveDB() {
+export function saveDB() {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
     // Also save backup
@@ -52,6 +52,9 @@ function saveDB() {
 
 // Load on startup
 loadDB();
+
+// Export db object for direct access
+export { db };
 
 // Products
 export function getProducts() {

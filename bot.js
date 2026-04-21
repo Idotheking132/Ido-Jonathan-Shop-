@@ -1,5 +1,7 @@
 import { Client, GatewayIntentBits, ChannelType, PermissionFlagsBits } from 'discord.js';
 import dotenv from 'dotenv';
+import * as db from './database.js';
+import { saveDB } from './database.js';
 
 dotenv.config();
 
@@ -72,11 +74,105 @@ client.on('interactionCreate', async (interaction) => {
   
   if (customId.startsWith('approve_bulk_')) {
     const orderId = parseInt(customId.split('_')[2]);
-    // Handle approval - will be done via API
-    await interaction.reply('✅ הזמנה אושרה! יוצר טיקט...');
-  } else if (customId.startsWith('reject_bulk_')) {
+    try {
+      await interaction.deferReply();
+      
+      // Get the bulk order from database
+      const allTickets = db.getAllTickets();
+      const bulkOrder = allTickets.find(t => t.id === orderId && t.is_bulk);
+      
+      if (!bulkOrder) {
+        return interaction.editReply('❌ הזמנה לא נמצאה');
+      }
+
+      // Update stock for all items
+      for (const item of bulkOrder.items) {
+        db.updateStock(item.quantity, item.productId);
+      }
+
+      // Create ticket for the user
+      const ticketChannelId = await createTicket(
+        bulkOrder.user_id,
+        bulkOrder.username,
+        `הזמנה גדולה #${bulkOrder.id}`,
+        bulkOrder.items.length,
+        bulkOrder.total_price
+      );
+
+      // Update bulk order status and channel
+      const ticketIndex = db.db.tickets.findIndex(t => t.id === orderId);
+      if (ticketIndex !== -1) {
+        db.db.tickets[ticketIndex].status = 'approved';
+        db.db.tickets[ticketIndex].channel_id = ticketChannelId;
+        saveDB();
+      }
+
+      // Send DM to user
+      try {
+        const user = await client.users.fetch(bulkOrder.user_id);
+        await user.send({
+          embeds: [{
+            title: '✅ הזמנה אושרה!',
+            color: 0x38a169,
+            fields: [
+              { name: '🆔 מזהה הזמנה', value: bulkOrder.id.toString() },
+              { name: '💰 סה"כ', value: `₪${bulkOrder.total_price.toFixed(2)}` },
+              { name: '🎫 טיקט', value: `<#${ticketChannelId}>` },
+            ],
+          }],
+        });
+      } catch (err) {
+        console.error('Could not send DM:', err);
+      }
+
+      await interaction.editReply(`✅ הזמנה #${orderId} אושרה! טיקט נוצר: <#${ticketChannelId}>`);
+    } catch (error) {
+      console.error('Error approving bulk order:', error);
+      await interaction.editReply('❌ שגיאה באישור ההזמנה');
+    }
+  } 
+  else if (customId.startsWith('reject_bulk_')) {
     const orderId = parseInt(customId.split('_')[2]);
-    await interaction.reply('❌ הזמנה דחויה');
+    try {
+      await interaction.deferReply();
+      
+      // Get the bulk order
+      const allTickets = db.getAllTickets();
+      const bulkOrder = allTickets.find(t => t.id === orderId && t.is_bulk);
+      
+      if (!bulkOrder) {
+        return interaction.editReply('❌ הזמנה לא נמצאה');
+      }
+
+      // Update status
+      const ticketIndex = db.db.tickets.findIndex(t => t.id === orderId);
+      if (ticketIndex !== -1) {
+        db.db.tickets[ticketIndex].status = 'rejected';
+        saveDB();
+      }
+
+      // Send DM to user
+      try {
+        const user = await client.users.fetch(bulkOrder.user_id);
+        await user.send({
+          embeds: [{
+            title: '❌ הזמנה דחויה',
+            color: 0xe53e3e,
+            fields: [
+              { name: '🆔 מזהה הזמנה', value: bulkOrder.id.toString() },
+              { name: '💬 הערה', value: 'ההזמנה דחויה על ידי מנהל' },
+            ],
+          }],
+        });
+      } catch (err) {
+        console.error('Could not send DM:', err);
+      }
+
+      await interaction.editReply(`❌ הזמנה #${orderId} דחויה`);
+    } catch (error) {
+      console.error('Error rejecting bulk order:', error);
+      await interaction.editReply('❌ שגיאה בדחיית ההזמנה');
+    }
   }
 });
 

@@ -5,6 +5,252 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ניהול — Ido & Jonathan Shop</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .admin-container {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 0;
+            min-height: calc(100vh - 60px);
+        }
+
+        .admin-sidebar {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            padding: 20px 0;
+            position: sticky;
+            top: 60px;
+            height: calc(100vh - 60px);
+            overflow-y: auto;
+        }
+
+        .admin-sidebar button {
+            width: 100%;
+            padding: 15px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            text-align: right;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            border-right: 3px solid transparent;
+        }
+
+        .admin-sidebar button:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+        }
+
+        .admin-sidebar button.active {
+            background: rgba(88, 101, 242, 0.1);
+            color: #5865F2;
+            border-right-color: #5865F2;
+        }
+
+        .admin-main {
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .admin-header h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .products-table {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .products-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .products-table thead {
+            background: rgba(88, 101, 242, 0.1);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .products-table th {
+            padding: 15px;
+            text-align: right;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .products-table td {
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .products-table tbody tr:hover {
+            background: rgba(88, 101, 242, 0.05);
+        }
+
+        .products-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 600px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #5865F2;
+            box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+
+        .btn-small {
+            padding: 8px 12px;
+            font-size: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #5865F2;
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .btn-small:hover {
+            background: #4752c4;
+        }
+
+        .btn-small.btn-danger {
+            background: #dc2626;
+        }
+
+        .btn-small.btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background: rgba(246, 173, 85, 0.2);
+            color: #f6ad55;
+        }
+
+        .status-approved {
+            background: rgba(104, 211, 145, 0.2);
+            color: #68d391;
+        }
+
+        .status-rejected {
+            background: rgba(252, 129, 129, 0.2);
+            color: #fc8181;
+        }
+
+        .status-closed {
+            background: rgba(160, 174, 192, 0.2);
+            color: #a0aec0;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .admin-container {
+                grid-template-columns: 1fr;
+            }
+
+            .admin-sidebar {
+                display: flex;
+                gap: 0;
+                height: auto;
+                border-left: none;
+                border-bottom: 1px solid var(--border);
+                overflow-x: auto;
+                position: relative;
+                top: 0;
+            }
+
+            .admin-sidebar button {
+                border-right: none;
+                border-bottom: 3px solid transparent;
+                white-space: nowrap;
+            }
+
+            .admin-sidebar button.active {
+                border-right: none;
+                border-bottom-color: #5865F2;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -17,87 +263,88 @@
         </div>
     </nav>
 
-    <div class="container">
-        <div class="admin-tabs">
-            <button class="tab-btn active" onclick="showTab('products', this)">מוצרים</button>
-            <button class="tab-btn" onclick="showTab('purchases', this)">קניות</button>
-            <button class="tab-btn" onclick="showTab('tickets', this)">ניהול הזמנות</button>
+    <div class="admin-container">
+        <div class="admin-sidebar">
+            <button class="tab-btn active" onclick="showTab('products', this)">📦 מוצרים</button>
+            <button class="tab-btn" onclick="showTab('purchases', this)">💳 קניות</button>
+            <button class="tab-btn" onclick="showTab('tickets', this)">🎫 הזמנות</button>
         </div>
 
-        <!-- Products Tab -->
-        <div id="products-tab" class="tab-content active">
-            <div class="admin-header">
-                <h2>מוצרים</h2>
-                <button class="btn-primary" onclick="openProductModal()">+ הוסף מוצר</button>
+        <div class="admin-main">
+            <!-- Products Tab -->
+            <div id="products-tab" class="tab-content active">
+                <div class="admin-header">
+                    <h2>ניהול מוצרים</h2>
+                    <button class="btn-primary" onclick="openProductModal()">+ הוסף מוצר</button>
+                </div>
+
+                <div class="products-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>שם</th>
+                                <th>מחיר</th>
+                                <th>מלאי</th>
+                                <th>מקס'</th>
+                                <th>VIP %</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-tbody">
+                            <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <div class="products-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>שם</th>
-                            <th>מחיר</th>
-                            <th>מלאי</th>
-                            <th>מקס'</th>
-                            <th>VIP %</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="products-tbody">
-                        <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
-                    </tbody>
-                </table>
+            <!-- Purchases Tab -->
+            <div id="purchases-tab" class="tab-content">
+                <div class="admin-header">
+                    <h2>היסטוריית קניות</h2>
+                </div>
+                <div class="products-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>קונה</th>
+                                <th>מוצר</th>
+                                <th>כמות</th>
+                                <th>מחיר</th>
+                                <th>תאריך</th>
+                            </tr>
+                        </thead>
+                        <tbody id="purchases-tbody">
+                            <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
 
-        <!-- Purchases Tab -->
-        <div id="purchases-tab" class="tab-content">
-            <div class="admin-header">
-                <h2>היסטוריית קניות</h2>
-            </div>
-            <div class="products-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>קונה</th>
-                            <th>מוצר</th>
-                            <th>כמות</th>
-                            <th>מחיר</th>
-                            <th>תאריך</th>
-                            <th>טיקט</th>
-                        </tr>
-                    </thead>
-                    <tbody id="purchases-tbody">
-                        <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tickets Tab -->
-        <div id="tickets-tab" class="tab-content">
-            <div class="admin-header">
-                <h2>ניהול הזמנות</h2>
-            </div>
-            <div class="products-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>קונה</th>
-                            <th>מוצר</th>
-                            <th>כמות</th>
-                            <th>מחיר</th>
-                            <th>סטטוס</th>
-                            <th>פעולות</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tickets-tbody">
-                        <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
-                    </tbody>
-                </table>
+            <!-- Tickets Tab -->
+            <div id="tickets-tab" class="tab-content">
+                <div class="admin-header">
+                    <h2>ניהול הזמנות</h2>
+                </div>
+                <div class="products-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>קונה</th>
+                                <th>מוצר</th>
+                                <th>כמות</th>
+                                <th>מחיר</th>
+                                <th>סטטוס</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tickets-tbody">
+                            <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -135,6 +382,7 @@
                     <div class="form-group">
                         <label>מקסימום לקנייה</label>
                         <input type="number" id="product-max-purchase" min="1" value="1" required>
+                        <small style="color: var(--text-secondary); margin-top: 5px; display: block;">הערה: הכנס -1 לקנייה ללא הגבלה</small>
                     </div>
                     <div class="form-group">
                         <label>הנחת VIP (%)</label>
@@ -160,6 +408,39 @@
         let purchases = [];
         let tickets = [];
         let editingProductId = null;
+        let ws = null;
+
+        // WebSocket connection
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+            ws.onopen = () => {
+                console.log('✓ WebSocket connected');
+            };
+
+            ws.onmessage = (event) => {
+                const { type, data } = JSON.parse(event.data);
+                
+                if (type === 'product_added' || type === 'product_updated' || type === 'product_deleted') {
+                    products = data;
+                    displayProducts();
+                }
+                
+                if (type === 'ticket_approved' || type === 'ticket_rejected' || type === 'ticket_closed') {
+                    loadTickets();
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('✗ WebSocket disconnected');
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
 
         async function loadProducts() {
             try {
@@ -199,11 +480,11 @@
             }
             tbody.innerHTML = products.map(p => `
                 <tr>
-                    <td>${p.id}</td>
+                    <td><strong>#${p.id}</strong></td>
                     <td style="color: var(--text-primary); font-weight: 500;">${p.name}</td>
-                    <td>₪${p.price.toFixed(2)}</td>
-                    <td>${p.stock}</td>
-                    <td>${p.max_purchase}</td>
+                    <td><strong>₪${p.price.toFixed(2)}</strong></td>
+                    <td><span style="background: ${p.stock > 0 ? 'rgba(104, 211, 145, 0.2)' : 'rgba(252, 129, 129, 0.2)'}; padding: 4px 8px; border-radius: 4px; color: ${p.stock > 0 ? '#68d391' : '#fc8181'};">${p.stock}</span></td>
+                    <td>${p.max_purchase === -1 ? '∞' : p.max_purchase}</td>
                     <td>${p.discount_vip}%</td>
                     <td>
                         <button class="btn-small" onclick="editProduct(${p.id})">ערוך</button>
@@ -216,18 +497,17 @@
         function displayPurchases() {
             const tbody = document.getElementById('purchases-tbody');
             if (purchases.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">אין קניות</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">אין קניות</td></tr>';
                 return;
             }
             tbody.innerHTML = purchases.map(p => `
                 <tr>
-                    <td>${p.id}</td>
+                    <td><strong>#${p.id}</strong></td>
                     <td style="color: var(--text-primary);">${p.username}</td>
                     <td>${p.product_name}</td>
                     <td>${p.quantity}</td>
-                    <td>₪${p.total_price.toFixed(2)}</td>
+                    <td><strong>₪${p.total_price.toFixed(2)}</strong></td>
                     <td>${new Date(p.purchased_at).toLocaleString('he-IL')}</td>
-                    <td>${p.ticket_channel_id ? '✓' : '—'}</td>
                 </tr>
             `).join('');
         }
@@ -240,23 +520,25 @@
             }
             tbody.innerHTML = tickets.map(t => `
                 <tr>
-                    <td>${t.id}</td>
+                    <td><strong>#${t.id}</strong></td>
                     <td style="color: var(--text-primary);">${t.username}</td>
                     <td>${t.product_name}</td>
                     <td>${t.quantity}</td>
-                    <td>₪${t.total_price.toFixed(2)}</td>
+                    <td><strong>₪${t.total_price.toFixed(2)}</strong></td>
                     <td>
-                        ${t.status === 'pending' ? '<span style="color: #f6ad55;">⏳ בהמתנה</span>' : ''}
-                        ${t.status === 'approved' ? '<span style="color: #68d391;">✅ אושר</span>' : ''}
-                        ${t.status === 'rejected' ? '<span style="color: #fc8181;">❌ דחוי</span>' : ''}
-                        ${t.status === 'closed' ? '<span style="color: #a0aec0;">🔒 סגור</span>' : ''}
+                        <span class="status-badge status-${t.status}">
+                            ${t.status === 'pending' ? '⏳ בהמתנה' : ''}
+                            ${t.status === 'approved' ? '✅ אושר' : ''}
+                            ${t.status === 'rejected' ? '❌ דחוי' : ''}
+                            ${t.status === 'closed' ? '🔒 סגור' : ''}
+                        </span>
                     </td>
                     <td>
                         ${t.status === 'pending' ? `
                             <button class="btn-small" onclick="approveTicket('${t.channel_id}')">אישור</button>
                             <button class="btn-small btn-danger" onclick="rejectTicket('${t.channel_id}')">דחייה</button>
                         ` : ''}
-                        <button class="btn-small btn-danger" onclick="closeTicketBtn('${t.channel_id}')">סגור</button>
+                        ${t.status !== 'closed' ? `<button class="btn-small btn-danger" onclick="closeTicketBtn('${t.channel_id}')">סגור</button>` : ''}
                     </td>
                 </tr>
             `).join('');
@@ -389,6 +671,7 @@
             if (event.target == document.getElementById('product-modal')) closeProductModal();
         }
 
+        connectWebSocket();
         loadProducts();
     </script>
 </body>

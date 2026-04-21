@@ -91,6 +91,37 @@
         let selectedQuantity = 1;
         let bulkCart = {};
         let orderType = null; // 'single' or 'bulk'
+        let ws = null;
+
+        // WebSocket connection for real-time updates
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+            ws.onopen = () => {
+                console.log('✓ WebSocket connected');
+            };
+
+            ws.onmessage = (event) => {
+                const { type, data } = JSON.parse(event.data);
+                
+                if (type === 'product_added' || type === 'product_updated' || type === 'product_deleted') {
+                    products = data;
+                    if (orderType) {
+                        displayProducts();
+                    }
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('✗ WebSocket disconnected');
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
 
         async function loadUser() {
             try {
@@ -326,6 +357,7 @@
             if (event.target == document.getElementById('cart-modal')) closeCart();
         }
 
+        connectWebSocket();
         loadUser();
     </script>
 </body>

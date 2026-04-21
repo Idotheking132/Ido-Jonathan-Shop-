@@ -2,6 +2,8 @@ import express from 'express';
 import session from 'express-session';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
 import { isUserInGuild, getUserRoles, createTicket, closeTicket, updateTicketStatus, isBotReady } from './bot.js';
 import client from './bot.js';
 import * as db from './database.js';
@@ -9,7 +11,37 @@ import * as db from './database.js';
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
 const PORT = process.env.PORT || 3000;
+
+// Store connected clients
+const clients = new Set();
+
+// WebSocket connection handler
+wss.on('connection', (ws) => {
+  clients.add(ws);
+  console.log(`✓ Client connected. Total: ${clients.size}`);
+
+  ws.on('close', () => {
+    clients.delete(ws);
+    console.log(`✗ Client disconnected. Total: ${clients.size}`);
+  });
+
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
+});
+
+// Broadcast updates to all connected clients
+function broadcastUpdate(type, data) {
+  const message = JSON.stringify({ type, data });
+  clients.forEach(client => {
+    if (client.readyState === 1) { // 1 = OPEN
+      client.send(message);
+    }
+  });
+}
 
 // Middleware
 app.use(express.json());
@@ -288,6 +320,9 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
       parseInt(discount_vip) || 0
     );
     
+    // Broadcast update
+    broadcastUpdate('product_added', db.getAllProducts());
+    
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -310,6 +345,9 @@ app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
       parseInt(id)
     );
     
+    // Broadcast update
+    broadcastUpdate('product_updated', db.getAllProducts());
+    
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -321,6 +359,10 @@ app.delete('/api/admin/products/:id', requireAdmin, (req, res) => {
   
   try {
     db.deleteProduct(parseInt(id));
+    
+    // Broadcast update
+    broadcastUpdate('product_deleted', db.getAllProducts());
+    
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -365,6 +407,10 @@ app.post('/api/admin/tickets/:channelId/approve', requireAdmin, async (req, res)
     db.updateTicketStatus(channelId, 'approved');
     
     await updateTicketStatus(channelId, '✅ אושר', '✅');
+    
+    // Broadcast update
+    broadcastUpdate('ticket_approved', { channelId, ticket });
+    
     res.json({ success: true, ticket });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -378,6 +424,10 @@ app.post('/api/admin/tickets/:channelId/reject', requireAdmin, async (req, res) 
     
     if (ticket) {
       await updateTicketStatus(channelId, '❌ דחוי', '❌');
+      
+      // Broadcast update
+      broadcastUpdate('ticket_rejected', { channelId, ticket });
+      
       res.json({ success: true, ticket });
     } else {
       res.status(404).json({ error: 'Ticket not found' });
@@ -395,6 +445,10 @@ app.post('/api/admin/tickets/:channelId/close', requireAdmin, async (req, res) =
     if (ticket) {
       await closeTicket(channelId);
       db.deleteTicket(channelId);
+      
+      // Broadcast update
+      broadcastUpdate('ticket_closed', { channelId });
+      
       res.json({ success: true });
     } else {
       res.status(404).json({ error: 'Ticket not found' });
@@ -479,6 +533,25 @@ app.post('/api/bulk-order', requireAuth, async (req, res) => {
           timestamp: new Date(),
           footer: { text: 'Ido & Jonathan Shop' },
         }],
+        components: [
+          {
+            type: 1,
+            components: [
+              {
+                type: 2,
+                label: 'אישור הזמנה',
+                style: 3,
+                custom_id: `approve_bulk_${bulkOrder.id}`,
+              },
+              {
+                type: 2,
+                label: 'דחיית הזמנה',
+                style: 4,
+                custom_id: `reject_bulk_${bulkOrder.id}`,
+              },
+            ],
+          },
+        ],
       });
 
       console.log('✓ Bulk order message sent:', bulkOrder.id);
@@ -500,6 +573,6 @@ app.post('/api/bulk-order', requireAuth, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
