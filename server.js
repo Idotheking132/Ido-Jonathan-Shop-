@@ -451,50 +451,39 @@ app.post('/api/bulk-order', requireAuth, async (req, res) => {
 
     // Send to approval channel
     const approvalChannelId = '1487800360784498826';
-    const channel = await client.channels.fetch(approvalChannelId);
     
-    const itemsList = items.map(item => {
-      const product = db.getProduct(item.productId);
-      return `• ${product.name} x${item.quantity}`;
-    }).join('\n');
+    try {
+      const channel = await client.channels.fetch(approvalChannelId);
+      
+      const itemsList = items.map(item => {
+        const product = db.getProduct(item.productId);
+        return `• ${product.name} x${item.quantity}`;
+      }).join('\n');
 
-    const message = await channel.send({
-      embeds: [{
-        title: '📦 הזמנה גדולה חדשה',
-        color: 0x5865F2,
-        fields: [
-          { name: '👤 קונה', value: `<@${userId}>`, inline: true },
-          { name: '🆔 מזהה הזמנה', value: bulkOrder.id.toString(), inline: true },
-          { name: '📋 פריטים', value: itemsList, inline: false },
-          { name: '💰 סה"כ', value: `₪${totalPrice.toFixed(2)}`, inline: true },
-        ],
-        timestamp: new Date(),
-        footer: { text: 'Ido & Jonathan Shop' },
-      }],
-      components: [{
-        type: 1,
-        components: [
-          {
-            type: 2,
-            label: 'אישור הזמנה',
-            style: 3,
-            custom_id: `approve_bulk_${bulkOrder.id}`,
-          },
-          {
-            type: 2,
-            label: 'דחיית הזמנה',
-            style: 4,
-            custom_id: `reject_bulk_${bulkOrder.id}`,
-          },
-        ],
-      }],
-    });
+      const message = await channel.send({
+        embeds: [{
+          title: '📦 הזמנה גדולה חדשה',
+          color: 0x5865F2,
+          fields: [
+            { name: '👤 קונה', value: `<@${userId}>`, inline: true },
+            { name: '🆔 מזהה הזמנה', value: bulkOrder.id.toString(), inline: true },
+            { name: '📋 פריטים', value: itemsList, inline: false },
+            { name: '💰 סה"כ', value: `₪${totalPrice.toFixed(2)}`, inline: true },
+          ],
+          timestamp: new Date(),
+          footer: { text: 'Ido & Jonathan Shop' },
+        }],
+      });
 
-    res.json({ 
-      success: true, 
-      message: 'Bulk order sent for approval',
-      orderId: bulkOrder.id
-    });
+      res.json({ 
+        success: true, 
+        message: 'Bulk order sent for approval',
+        orderId: bulkOrder.id
+      });
+    } catch (channelError) {
+      console.error('Error sending to approval channel:', channelError);
+      res.status(500).json({ error: 'Failed to send approval message' });
+    }
   } catch (error) {
     console.error('Bulk order error:', error);
     res.status(500).json({ error: 'Error creating bulk order' });

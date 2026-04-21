@@ -18,13 +18,35 @@
         </div>
     </nav>
 
-    <div class="container">
+    <!-- Order Type Selection Modal -->
+    <div id="order-type-modal" class="modal" style="display: flex; align-items: center; justify-content: center;">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 style="text-align: center; margin-bottom: 30px;">בחר סוג הזמנה</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <button class="btn-primary" onclick="selectOrderType('single')" style="padding: 40px; font-size: 16px; height: auto;">
+                    <div style="font-size: 32px; margin-bottom: 10px;">📦</div>
+                    <div>הזמנה קטנה</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">חומר אחד בלבד</div>
+                </button>
+                <button class="btn-primary" onclick="selectOrderType('bulk')" style="padding: 40px; font-size: 16px; height: auto;">
+                    <div style="font-size: 32px; margin-bottom: 10px;">📦📦📦</div>
+                    <div>הזמנה גדולה</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">הרבה חומרים</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="shop-container" style="display: none;">
         <div id="cooldown-message" class="info-message" style="display: none;"></div>
 
         <div class="shop-header">
             <h2>מוצרים</h2>
             <p id="vip-label" style="display:none; color: #68d391;">יש לך הנחת VIP פעילה</p>
-            <button class="btn-primary" onclick="openBulkOrder()" style="margin-right: auto;">📦 הזמנה גדולה</button>
+            <div style="display: flex; gap: 10px; margin-right: auto;">
+                <button class="btn-primary" id="cart-btn" onclick="openCart()" style="display: none;">🛒 סל קניות (<span id="cart-count">0</span>)</button>
+                <button class="btn-secondary" onclick="changeOrderType()">↩️ חזור לבחירה</button>
+            </div>
         </div>
 
         <div class="products-grid" id="products-grid">
@@ -45,19 +67,19 @@
         </div>
     </div>
 
-    <!-- Bulk Order Modal -->
-    <div id="bulk-modal" class="modal">
+    <!-- Cart Modal -->
+    <div id="cart-modal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeBulkModal()">&times;</span>
-            <h2>הזמנה גדולה</h2>
-            <div id="bulk-items" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;"></div>
+            <span class="close" onclick="closeCart()">&times;</span>
+            <h2>סל קניות</h2>
+            <div id="cart-items" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;"></div>
             <div class="purchase-total">
                 <strong>סה"כ</strong>
-                <span id="bulk-total">₪0.00</span>
+                <span id="cart-total">₪0.00</span>
             </div>
             <div class="modal-actions">
                 <button class="btn-primary" onclick="submitBulkOrder()">שלח להזמנה</button>
-                <button class="btn-secondary" onclick="closeBulkModal()">ביטול</button>
+                <button class="btn-secondary" onclick="closeCart()">ביטול</button>
             </div>
         </div>
     </div>
@@ -68,6 +90,7 @@
         let selectedProduct = null;
         let selectedQuantity = 1;
         let bulkCart = {};
+        let orderType = null; // 'single' or 'bulk'
 
         async function loadUser() {
             try {
@@ -84,6 +107,25 @@
             } catch (error) {
                 console.error('Error loading user:', error);
             }
+        }
+
+        function selectOrderType(type) {
+            orderType = type;
+            document.getElementById('order-type-modal').style.display = 'none';
+            document.getElementById('shop-container').style.display = 'block';
+            
+            if (type === 'bulk') {
+                document.getElementById('cart-btn').style.display = 'inline-block';
+            }
+            
+            loadProducts();
+        }
+
+        function changeOrderType() {
+            orderType = null;
+            bulkCart = {};
+            document.getElementById('order-type-modal').style.display = 'flex';
+            document.getElementById('shop-container').style.display = 'none';
         }
 
         async function loadProducts() {
@@ -119,8 +161,11 @@
                             <span class="product-limit">${product.unlimited ? 'ללא הגבלה' : `מקס': ${product.max_purchase}`}</span>
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn-buy" onclick="openPurchaseModal(${product.id})" style="flex: 1;">קנייה</button>
-                            <button class="btn-buy" onclick="addToBulk(${product.id})" style="flex: 1;">הוסף להזמנה</button>
+                            ${orderType === 'single' ? `
+                                <button class="btn-buy" onclick="openPurchaseModal(${product.id})" style="flex: 1;">קנייה</button>
+                            ` : `
+                                <button class="btn-buy" onclick="addToBulk(${product.id})" style="flex: 1;">הוסף להזמנה</button>
+                            `}
                         </div>
                     </div>
                 </div>
@@ -193,11 +238,17 @@
                     bulkCart[productId] = 0;
                 }
                 bulkCart[productId] += parseInt(quantity);
+                updateCartCount();
                 alert(`✓ ${quantity}x ${product.name} הוסיף להזמנה`);
             }
         }
 
-        function openBulkOrder() {
+        function updateCartCount() {
+            const count = Object.values(bulkCart).reduce((a, b) => a + b, 0);
+            document.getElementById('cart-count').textContent = count;
+        }
+
+        function openCart() {
             const items = Object.keys(bulkCart).map(productId => {
                 const product = products.find(p => p.id === parseInt(productId));
                 return `
@@ -222,18 +273,23 @@
                 total += product.price * bulkCart[productId];
             });
 
-            document.getElementById('bulk-items').innerHTML = items;
-            document.getElementById('bulk-total').textContent = `₪${total.toFixed(2)}`;
-            document.getElementById('bulk-modal').style.display = 'block';
+            document.getElementById('cart-items').innerHTML = items;
+            document.getElementById('cart-total').textContent = `₪${total.toFixed(2)}`;
+            document.getElementById('cart-modal').style.display = 'block';
         }
 
-        function closeBulkModal() {
-            document.getElementById('bulk-modal').style.display = 'none';
+        function closeCart() {
+            document.getElementById('cart-modal').style.display = 'none';
         }
 
         function removeFromBulk(productId) {
             delete bulkCart[productId];
-            openBulkOrder();
+            updateCartCount();
+            if (Object.keys(bulkCart).length === 0) {
+                closeCart();
+            } else {
+                openCart();
+            }
         }
 
         async function submitBulkOrder() {
@@ -254,22 +310,23 @@
                 if (response.ok) {
                     alert('✓ הזמנה שלחה לאישור! תקבל הודעה בדיסקורד');
                     bulkCart = {};
-                    closeBulkModal();
+                    updateCartCount();
+                    closeCart();
                 } else {
-                    alert(data.error);
+                    alert('❌ ' + (data.error || 'שגיאה בשליחת ההזמנה'));
                 }
             } catch (error) {
-                alert('שגיאה בשליחת ההזמנה');
+                alert('❌ שגיאה בשליחת ההזמנה');
+                console.error(error);
             }
         }
 
         window.onclick = function(event) {
             if (event.target == document.getElementById('purchase-modal')) closePurchaseModal();
-            if (event.target == document.getElementById('bulk-modal')) closeBulkModal();
+            if (event.target == document.getElementById('cart-modal')) closeCart();
         }
 
         loadUser();
-        loadProducts();
     </script>
 </body>
 </html>
