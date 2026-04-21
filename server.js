@@ -42,6 +42,29 @@ const requireAdmin = async (req, res, next) => {
   next();
 };
 
+// Debug endpoint - remove after fixing
+app.get('/debug/roles', async (req, res) => {
+  const userId = req.query.id;
+  if (!userId) return res.json({ error: 'provide ?id=YOUR_DISCORD_ID' });
+  
+  try {
+    const roles = await getUserRoles(userId);
+    const inGuild = roles.length > 0;
+    res.json({
+      userId,
+      inGuild,
+      roles,
+      BUYER_ROLE_ID: process.env.BUYER_ROLE_ID,
+      ADMIN_ROLE_ID: process.env.ADMIN_ROLE_ID,
+      GUILD_ID: process.env.GUILD_ID,
+      hasBuyer: roles.includes(process.env.BUYER_ROLE_ID),
+      hasAdmin: roles.includes(process.env.ADMIN_ROLE_ID),
+    });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
 // Routes
 app.get('/', (req, res) => {
   res.sendFile('index.html', { root: './public' });
