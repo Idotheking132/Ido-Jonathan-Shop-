@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 const DB_FILE = 'shop.json';
+const DB_BACKUP = 'shop.backup.json';
 
 // Initialize database structure
 let db = {
@@ -14,10 +15,25 @@ let db = {
 // Load database from file
 function loadDB() {
   try {
+    // Try to load main file first
     if (fs.existsSync(DB_FILE)) {
       const data = fs.readFileSync(DB_FILE, 'utf8');
       db = JSON.parse(data);
+      console.log('✓ Database loaded from shop.json');
+      return;
     }
+    
+    // If main file doesn't exist, try backup
+    if (fs.existsSync(DB_BACKUP)) {
+      const data = fs.readFileSync(DB_BACKUP, 'utf8');
+      db = JSON.parse(data);
+      // Restore from backup
+      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+      console.log('✓ Database restored from backup');
+      return;
+    }
+    
+    console.log('ℹ Database initialized (new)');
   } catch (error) {
     console.error('Error loading database:', error);
   }
@@ -27,6 +43,8 @@ function loadDB() {
 function saveDB() {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+    // Also save backup
+    fs.writeFileSync(DB_BACKUP, JSON.stringify(db, null, 2));
   } catch (error) {
     console.error('Error saving database:', error);
   }

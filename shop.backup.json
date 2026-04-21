@@ -1,0 +1,31 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "name": "בדיקה",
+      "description": "",
+      "price": 0,
+      "stock": 0,
+      "max_purchase": 1,
+      "image_url": "",
+      "discount_vip": 2,
+      "created_at": "2026-04-21T10:20:23.944Z"
+    }
+  ],
+  "purchases": [
+    {
+      "id": 1,
+      "user_id": "769418979718463500",
+      "username": "ido_6689",
+      "product_id": 1,
+      "quantity": 1,
+      "total_price": 0,
+      "ticket_channel_id": "1496093281321488424",
+      "purchased_at": "2026-04-21T10:20:35.623Z"
+    }
+  ],
+  "tickets": [],
+  "cooldowns": {
+    "769418979718463500": "2026-04-21T10:20:35.624Z"
+  }
+}
