@@ -57,6 +57,7 @@ export function addProduct(name, description, price, stock, maxPurchase, imageUr
     price,
     stock,
     max_purchase: maxPurchase,
+    unlimited: maxPurchase === -1, // -1 means unlimited
     image_url: imageUrl,
     discount_vip: discountVip,
     created_at: new Date().toISOString()
@@ -76,6 +77,7 @@ export function updateProduct(name, description, price, stock, maxPurchase, imag
       price,
       stock,
       max_purchase: maxPurchase,
+      unlimited: maxPurchase === -1,
       image_url: imageUrl,
       discount_vip: discountVip
     };
@@ -140,6 +142,26 @@ export function addTicket(userId, username, productId, quantity, totalPrice, cha
     total_price: totalPrice,
     channel_id: channelId,
     status: 'pending', // pending, approved, rejected, closed
+    is_bulk: false, // false for regular, true for bulk order
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  db.tickets.push(ticket);
+  saveDB();
+  return ticket;
+}
+
+export function addBulkOrder(userId, username, items, totalPrice) {
+  const id = db.tickets.length > 0 ? Math.max(...db.tickets.map(t => t.id)) + 1 : 1;
+  const ticket = {
+    id,
+    user_id: userId,
+    username,
+    items, // array of {product_id, quantity}
+    total_price: totalPrice,
+    channel_id: null,
+    status: 'pending_approval', // pending_approval, approved, rejected, closed
+    is_bulk: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
@@ -175,6 +197,12 @@ export function updateTicketStatus(channelId, status) {
 
 export function deleteTicket(channelId) {
   db.tickets = db.tickets.filter(t => t.channel_id !== channelId);
+  saveDB();
+}
+
+// Cooldowns - remove for specific user
+export function removeCooldown(userId) {
+  delete db.cooldowns[userId];
   saveDB();
 }
 

@@ -220,7 +220,7 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
     }
 
     // Check max purchase
-    if (quantity > product.max_purchase) {
+    if (quantity > product.max_purchase && product.max_purchase !== -1) {
       return res.status(400).json({ 
         error: `ניתן לקנות עד ${product.max_purchase} יחידות בלבד` 
       });
@@ -246,13 +246,7 @@ app.post('/api/purchase', requireAuth, async (req, res) => {
       totalPrice
     );
 
-    // Update stock
-    db.updateStock(quantity, productId);
-
-    // Add purchase record
-    db.addPurchase(userId, username, productId, quantity, totalPrice, ticketChannelId);
-
-    // Add ticket record
+    // Add ticket record (DON'T update stock yet - wait for approval)
     db.addTicket(userId, username, productId, quantity, totalPrice, ticketChannelId);
 
     // Set cooldown
@@ -354,14 +348,23 @@ app.get('/api/admin/tickets', requireAdmin, (req, res) => {
 app.post('/api/admin/tickets/:channelId/approve', requireAdmin, async (req, res) => {
   try {
     const { channelId } = req.params;
-    const ticket = db.updateTicketStatus(channelId, 'approved');
+    const ticket = db.getTicket(channelId);
     
-    if (ticket) {
-      await updateTicketStatus(channelId, '✅ אושר', '✅');
-      res.json({ success: true, ticket });
-    } else {
-      res.status(404).json({ error: 'Ticket not found' });
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
     }
+
+    // Update stock only now
+    db.updateStock(ticket.quantity, ticket.product_id);
+
+    // Add purchase record
+    db.addPurchase(ticket.user_id, ticket.username, ticket.product_id, ticket.quantity, ticket.total_price, channelId);
+
+    // Update ticket status
+    db.updateTicketStatus(channelId, 'approved');
+    
+    await updateTicketStatus(channelId, '✅ אושר', '✅');
+    res.json({ success: true, ticket });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -397,6 +400,104 @@ app.post('/api/admin/tickets/:channelId/close', requireAdmin, async (req, res) =
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Remove cooldown for user
+app.post('/api/admin/users/:userId/remove-cooldown', requireAdmin, (req, res) => {
+  try {
+    const { userId } = req.params;
+    db.removeCooldown(userId);
+    res.json({ success: true, message: 'Cooldown removed' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk order
+app.post('/api/bulk-order', requireAuth, async (req, res) => {
+  const { items } = req.body; // [{productId, quantity}, ...]
+  const userId = req.session.user.id;
+  const username = req.session.user.username;
+
+  try {
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'No items in order' });
+    }
+
+    // Validate all items exist and have stock
+    let totalPrice = 0;
+    const roles = req.session.user.roles;
+    const hasVIP = roles.includes(process.env.VIP_ROLE_ID);
+
+    for (const item of items) {
+      const product = db.getProduct(item.productId);
+      if (!product) {
+        return res.status(404).json({ error: `Product ${item.productId} not found` });
+      }
+      if (product.stock < item.quantity) {
+        return res.status(400).json({ error: `Not enough stock for ${product.name}` });
+      }
+
+      let price = product.price;
+      if (hasVIP && product.discount_vip > 0) {
+        price = price * (1 - product.discount_vip / 100);
+      }
+      totalPrice += price * item.quantity;
+    }
+
+    // Create bulk order
+    const bulkOrder = db.addBulkOrder(userId, username, items, totalPrice);
+
+    // Send to approval channel
+    const approvalChannelId = '1487800360784498826';
+    const channel = await client.channels.fetch(approvalChannelId);
+    
+    const itemsList = items.map(item => {
+      const product = db.getProduct(item.productId);
+      return `• ${product.name} x${item.quantity}`;
+    }).join('\n');
+
+    const message = await channel.send({
+      embeds: [{
+        title: '📦 הזמנה גדולה חדשה',
+        color: 0x5865F2,
+        fields: [
+          { name: '👤 קונה', value: `<@${userId}>`, inline: true },
+          { name: '🆔 מזהה הזמנה', value: bulkOrder.id.toString(), inline: true },
+          { name: '📋 פריטים', value: itemsList, inline: false },
+          { name: '💰 סה"כ', value: `₪${totalPrice.toFixed(2)}`, inline: true },
+        ],
+        timestamp: new Date(),
+        footer: { text: 'Ido & Jonathan Shop' },
+      }],
+      components: [{
+        type: 1,
+        components: [
+          {
+            type: 2,
+            label: 'אישור הזמנה',
+            style: 3,
+            custom_id: `approve_bulk_${bulkOrder.id}`,
+          },
+          {
+            type: 2,
+            label: 'דחיית הזמנה',
+            style: 4,
+            custom_id: `reject_bulk_${bulkOrder.id}`,
+          },
+        ],
+      }],
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Bulk order sent for approval',
+      orderId: bulkOrder.id
+    });
+  } catch (error) {
+    console.error('Bulk order error:', error);
+    res.status(500).json({ error: 'Error creating bulk order' });
   }
 });
 

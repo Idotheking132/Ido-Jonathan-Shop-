@@ -24,6 +24,7 @@
         <div class="shop-header">
             <h2>מוצרים</h2>
             <p id="vip-label" style="display:none; color: #68d391;">יש לך הנחת VIP פעילה</p>
+            <button class="btn-primary" onclick="openBulkOrder()" style="margin-right: auto;">📦 הזמנה גדולה</button>
         </div>
 
         <div class="products-grid" id="products-grid">
@@ -44,11 +45,29 @@
         </div>
     </div>
 
+    <!-- Bulk Order Modal -->
+    <div id="bulk-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeBulkModal()">&times;</span>
+            <h2>הזמנה גדולה</h2>
+            <div id="bulk-items" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;"></div>
+            <div class="purchase-total">
+                <strong>סה"כ</strong>
+                <span id="bulk-total">₪0.00</span>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="submitBulkOrder()">שלח להזמנה</button>
+                <button class="btn-secondary" onclick="closeBulkModal()">ביטול</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentUser = null;
         let products = [];
         let selectedProduct = null;
         let selectedQuantity = 1;
+        let bulkCart = {};
 
         async function loadUser() {
             try {
@@ -97,9 +116,12 @@
                         </div>
                         <div class="product-meta">
                             <span class="product-stock">מלאי: ${product.stock}</span>
-                            <span class="product-limit">מקס': ${product.max_purchase}</span>
+                            <span class="product-limit">${product.unlimited ? 'ללא הגבלה' : `מקס': ${product.max_purchase}`}</span>
                         </div>
-                        <button class="btn-buy" onclick="openPurchaseModal(${product.id})">רכישה</button>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-buy" onclick="openPurchaseModal(${product.id})" style="flex: 1;">קנייה</button>
+                            <button class="btn-buy" onclick="addToBulk(${product.id})" style="flex: 1;">הוסף להזמנה</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -115,14 +137,14 @@
                     <p>${selectedProduct.description || ''}</p>
                     <div class="quantity-selector">
                         <label>כמות</label>
-                        <input type="number" id="quantity-input" value="1" min="1" max="${selectedProduct.max_purchase}" onchange="updatePurchaseTotal()">
+                        <input type="number" id="quantity-input" value="1" min="1" ${selectedProduct.unlimited ? '' : `max="${selectedProduct.max_purchase}"`} onchange="updatePurchaseTotal()">
                     </div>
                     <div class="purchase-total">
                         <strong>סה"כ</strong>
                         <span id="total-price">₪${selectedProduct.price.toFixed(2)}</span>
                     </div>
                     ${selectedProduct.has_discount ? '<p class="vip-notice">הנחת VIP הופעלה</p>' : ''}
-                    <p class="cooldown-notice">לאחר הרכישה תוכל לקנות שוב בעוד 7 ימים</p>
+                    <p class="cooldown-notice">לאחר אישור הקנייה תוכל לקנות שוב בעוד 7 ימים</p>
                 </div>
             `;
 
@@ -162,8 +184,88 @@
             }
         }
 
+        function addToBulk(productId) {
+            const product = products.find(p => p.id === productId);
+            const quantity = prompt(`כמה ${product.name} להוסיף?`, '1');
+            
+            if (quantity && parseInt(quantity) > 0) {
+                if (!bulkCart[productId]) {
+                    bulkCart[productId] = 0;
+                }
+                bulkCart[productId] += parseInt(quantity);
+                alert(`✓ ${quantity}x ${product.name} הוסיף להזמנה`);
+            }
+        }
+
+        function openBulkOrder() {
+            const items = Object.keys(bulkCart).map(productId => {
+                const product = products.find(p => p.id === parseInt(productId));
+                return `
+                    <div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid var(--border); align-items: center;">
+                        <span>${product.name} x${bulkCart[productId]}</span>
+                        <div style="display: flex; gap: 8px;">
+                            <span>₪${(product.price * bulkCart[productId]).toFixed(2)}</span>
+                            <button class="btn-small btn-danger" onclick="removeFromBulk(${productId})">הסר</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (Object.keys(bulkCart).length === 0) {
+                alert('הוסף מוצרים להזמנה קודם');
+                return;
+            }
+
+            let total = 0;
+            Object.keys(bulkCart).forEach(productId => {
+                const product = products.find(p => p.id === parseInt(productId));
+                total += product.price * bulkCart[productId];
+            });
+
+            document.getElementById('bulk-items').innerHTML = items;
+            document.getElementById('bulk-total').textContent = `₪${total.toFixed(2)}`;
+            document.getElementById('bulk-modal').style.display = 'block';
+        }
+
+        function closeBulkModal() {
+            document.getElementById('bulk-modal').style.display = 'none';
+        }
+
+        function removeFromBulk(productId) {
+            delete bulkCart[productId];
+            openBulkOrder();
+        }
+
+        async function submitBulkOrder() {
+            const items = Object.keys(bulkCart).map(productId => ({
+                productId: parseInt(productId),
+                quantity: bulkCart[productId]
+            }));
+
+            try {
+                const response = await fetch('/api/bulk-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('✓ הזמנה שלחה לאישור! תקבל הודעה בדיסקורד');
+                    bulkCart = {};
+                    closeBulkModal();
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('שגיאה בשליחת ההזמנה');
+            }
+        }
+
         window.onclick = function(event) {
             if (event.target == document.getElementById('purchase-modal')) closePurchaseModal();
+            if (event.target == document.getElementById('bulk-modal')) closeBulkModal();
         }
 
         loadUser();

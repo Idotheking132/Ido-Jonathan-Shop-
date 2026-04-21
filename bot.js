@@ -56,6 +56,22 @@ client.on('messageCreate', async (message) => {
   }
 });
 
+// Handle button interactions for bulk orders
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isButton()) return;
+
+  const customId = interaction.customId;
+  
+  if (customId.startsWith('approve_bulk_')) {
+    const orderId = parseInt(customId.split('_')[2]);
+    // Handle approval - will be done via API
+    await interaction.reply('✅ הזמנה אושרה! יוצר טיקט...');
+  } else if (customId.startsWith('reject_bulk_')) {
+    const orderId = parseInt(customId.split('_')[2]);
+    await interaction.reply('❌ הזמנה דחויה');
+  }
+});
+
 client.login(process.env.DISCORD_BOT_TOKEN).catch(err => {
   console.error('Failed to login bot:', err);
 });
