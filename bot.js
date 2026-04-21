@@ -42,14 +42,17 @@ client.on('messageCreate', async (message) => {
       return message.reply('❌ פקודה זו עובדת רק בערוצי טיקטים');
     }
 
-    // Archive and close the channel
-    await message.channel.setArchived(true);
-    await message.reply('✅ הטיקט סגור');
+    // Send closing message
+    await message.reply('✅ הטיקט נסגר');
 
-    // Delete after 5 seconds
-    setTimeout(() => {
-      message.channel.delete().catch(err => console.error('Error deleting channel:', err));
-    }, 5000);
+    // Wait a bit then delete the channel
+    setTimeout(async () => {
+      try {
+        await message.channel.delete();
+      } catch (err) {
+        console.error('Error deleting channel:', err);
+      }
+    }, 2000);
   } catch (error) {
     console.error('Error in .siteclose command:', error);
     message.reply('❌ שגיאה בסגירת הטיקט');
