@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ido & Jonathan Shop - חנות</title>
+    <title>Ido & Jonathan Shop</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-content">
-            <h1>🛍️ Ido & Jonathan Shop</h1>
+            <h1>Ido & Jonathan Shop</h1>
             <div class="nav-right">
                 <span id="user-info"></span>
-                <button id="admin-btn" style="display: none;" onclick="location.href='/admin'">⚙️ ניהול</button>
+                <button id="admin-btn" style="display: none;" onclick="location.href='/admin'">ניהול</button>
                 <button onclick="location.href='/auth/logout'">יציאה</button>
             </div>
         </div>
@@ -20,7 +20,12 @@
 
     <div class="container">
         <div id="cooldown-message" class="info-message" style="display: none;"></div>
-        
+
+        <div class="shop-header">
+            <h2>מוצרים</h2>
+            <p id="vip-label" style="display:none; color: #68d391;">יש לך הנחת VIP פעילה</p>
+        </div>
+
         <div class="products-grid" id="products-grid">
             <div class="loading">טוען מוצרים...</div>
         </div>
@@ -33,7 +38,7 @@
             <h2>אישור קנייה</h2>
             <div id="purchase-details"></div>
             <div class="modal-actions">
-                <button class="btn-primary" onclick="confirmPurchase()">אישור קנייה</button>
+                <button class="btn-primary" onclick="confirmPurchase()">אישור</button>
                 <button class="btn-secondary" onclick="closePurchaseModal()">ביטול</button>
             </div>
         </div>
@@ -49,12 +54,13 @@
             try {
                 const response = await fetch('/api/user');
                 currentUser = await response.json();
-                
-                document.getElementById('user-info').textContent = `שלום, ${currentUser.username}`;
-                
-                // Check if admin
+                document.getElementById('user-info').textContent = currentUser.username;
+
                 if (currentUser.roles.includes('1487800359341785213')) {
                     document.getElementById('admin-btn').style.display = 'inline-block';
+                }
+                if (currentUser.roles.includes('1487800359379537968')) {
+                    document.getElementById('vip-label').style.display = 'block';
                 }
             } catch (error) {
                 console.error('Error loading user:', error);
@@ -67,35 +73,33 @@
                 products = await response.json();
                 displayProducts();
             } catch (error) {
-                console.error('Error loading products:', error);
-                document.getElementById('products-grid').innerHTML = '<div class="error">שגיאה בטעינת המוצרים</div>';
+                document.getElementById('products-grid').innerHTML = '<div class="loading">שגיאה בטעינת המוצרים</div>';
             }
         }
 
         function displayProducts() {
             const grid = document.getElementById('products-grid');
-            
+
             if (products.length === 0) {
                 grid.innerHTML = '<div class="no-products">אין מוצרים זמינים כרגע</div>';
                 return;
             }
-            
+
             grid.innerHTML = products.map(product => `
                 <div class="product-card">
-                    ${product.image_url ? `<img src="${product.image_url}" alt="${product.name}">` : '<div class="no-image">📦</div>'}
+                    ${product.image_url ? `<img src="${product.image_url}" alt="${product.name}">` : '<div class="no-image">—</div>'}
                     <div class="product-info">
                         <h3>${product.name}</h3>
                         <p class="product-description">${product.description || ''}</p>
                         <div class="product-price">
-                            ${product.has_discount ? `
-                                <span class="original-price">₪${product.original_price.toFixed(2)}</span>
-                                <span class="discount-badge">-${product.discount_percent}% VIP</span>
-                            ` : ''}
                             <span class="price">₪${product.price.toFixed(2)}</span>
+                            ${product.has_discount ? `<span class="original-price">₪${product.original_price.toFixed(2)}</span><span class="discount-badge">-${product.discount_percent}%</span>` : ''}
                         </div>
-                        <div class="product-stock">במלאי: ${product.stock} יחידות</div>
-                        <div class="product-limit">מקסימום לקנייה: ${product.max_purchase}</div>
-                        <button class="btn-buy" onclick="openPurchaseModal(${product.id})">קנה עכשיו</button>
+                        <div class="product-meta">
+                            <span class="product-stock">מלאי: ${product.stock}</span>
+                            <span class="product-limit">מקס': ${product.max_purchase}</span>
+                        </div>
+                        <button class="btn-buy" onclick="openPurchaseModal(${product.id})">רכישה</button>
                     </div>
                 </div>
             `).join('');
@@ -104,24 +108,24 @@
         function openPurchaseModal(productId) {
             selectedProduct = products.find(p => p.id === productId);
             selectedQuantity = 1;
-            
+
             document.getElementById('purchase-details').innerHTML = `
                 <div class="purchase-info">
                     <h3>${selectedProduct.name}</h3>
                     <p>${selectedProduct.description || ''}</p>
                     <div class="quantity-selector">
-                        <label>כמות:</label>
+                        <label>כמות</label>
                         <input type="number" id="quantity-input" value="1" min="1" max="${selectedProduct.max_purchase}" onchange="updatePurchaseTotal()">
                     </div>
                     <div class="purchase-total">
-                        <strong>סה"כ לתשלום:</strong>
+                        <strong>סה"כ</strong>
                         <span id="total-price">₪${selectedProduct.price.toFixed(2)}</span>
                     </div>
-                    ${selectedProduct.has_discount ? '<p class="vip-notice">✨ הנחת VIP הופעלה!</p>' : ''}
-                    <p class="cooldown-notice">⏰ לאחר הקנייה תוכל לקנות שוב בעוד 7 ימים</p>
+                    ${selectedProduct.has_discount ? '<p class="vip-notice">הנחת VIP הופעלה</p>' : ''}
+                    <p class="cooldown-notice">לאחר הרכישה תוכל לקנות שוב בעוד 7 ימים</p>
                 </div>
             `;
-            
+
             document.getElementById('purchase-modal').style.display = 'block';
         }
 
@@ -141,36 +145,27 @@
                 const response = await fetch('/api/purchase', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        productId: selectedProduct.id,
-                        quantity: selectedQuantity
-                    })
+                    body: JSON.stringify({ productId: selectedProduct.id, quantity: selectedQuantity })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    alert('✅ ' + data.message);
+                    alert('✓ ' + data.message);
                     closePurchaseModal();
-                    loadProducts(); // Refresh products
+                    loadProducts();
                 } else {
-                    alert('❌ ' + data.error);
+                    alert(data.error);
                 }
             } catch (error) {
-                alert('❌ שגיאה בביצוע הקנייה');
-                console.error(error);
+                alert('שגיאה בביצוע הרכישה');
             }
         }
 
-        // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('purchase-modal');
-            if (event.target == modal) {
-                closePurchaseModal();
-            }
+            if (event.target == document.getElementById('purchase-modal')) closePurchaseModal();
         }
 
-        // Load data on page load
         loadUser();
         loadProducts();
     </script>

@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ido & Jonathan Shop - פאנל ניהול</title>
+    <title>ניהול — Ido & Jonathan Shop</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-content">
-            <h1>⚙️ פאנל ניהול</h1>
+            <h1>ניהול</h1>
             <div class="nav-right">
-                <button onclick="location.href='/shop'">🛍️ חזרה לחנות</button>
+                <button onclick="location.href='/shop'">חנות</button>
                 <button onclick="location.href='/auth/logout'">יציאה</button>
             </div>
         </div>
@@ -19,33 +19,32 @@
 
     <div class="container">
         <div class="admin-tabs">
-            <button class="tab-btn active" onclick="showTab('products')">מוצרים</button>
-            <button class="tab-btn" onclick="showTab('purchases')">היסטוריית קניות</button>
+            <button class="tab-btn active" onclick="showTab('products', this)">מוצרים</button>
+            <button class="tab-btn" onclick="showTab('purchases', this)">קניות</button>
         </div>
 
         <!-- Products Tab -->
         <div id="products-tab" class="tab-content active">
             <div class="admin-header">
-                <h2>ניהול מוצרים</h2>
-                <button class="btn-primary" onclick="openProductModal()">➕ הוסף מוצר חדש</button>
+                <h2>מוצרים</h2>
+                <button class="btn-primary" onclick="openProductModal()">+ הוסף מוצר</button>
             </div>
-            
+
             <div class="products-table">
-                <table id="products-table">
+                <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th>#</th>
                             <th>שם</th>
-                            <th>תיאור</th>
                             <th>מחיר</th>
                             <th>מלאי</th>
-                            <th>מקס' קנייה</th>
-                            <th>הנחת VIP</th>
-                            <th>פעולות</th>
+                            <th>מקס'</th>
+                            <th>VIP %</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="products-tbody">
-                        <tr><td colspan="8">טוען...</td></tr>
+                        <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -53,22 +52,24 @@
 
         <!-- Purchases Tab -->
         <div id="purchases-tab" class="tab-content">
-            <h2>היסטוריית קניות</h2>
+            <div class="admin-header">
+                <h2>היסטוריית קניות</h2>
+            </div>
             <div class="products-table">
-                <table id="purchases-table">
+                <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th>#</th>
                             <th>קונה</th>
                             <th>מוצר</th>
                             <th>כמות</th>
-                            <th>מחיר כולל</th>
+                            <th>מחיר</th>
                             <th>תאריך</th>
                             <th>טיקט</th>
                         </tr>
                     </thead>
                     <tbody id="purchases-tbody">
-                        <tr><td colspan="7">טוען...</td></tr>
+                        <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">טוען...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -79,49 +80,47 @@
     <div id="product-modal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeProductModal()">&times;</span>
-            <h2 id="modal-title">הוסף מוצר חדש</h2>
+            <h2 id="modal-title">הוסף מוצר</h2>
             <form id="product-form" onsubmit="saveProduct(event)">
                 <input type="hidden" id="product-id">
-                
+
                 <div class="form-group">
-                    <label>שם המוצר *</label>
+                    <label>שם המוצר</label>
                     <input type="text" id="product-name" required>
                 </div>
-                
+
                 <div class="form-group">
                     <label>תיאור</label>
                     <textarea id="product-description" rows="3"></textarea>
                 </div>
-                
+
                 <div class="form-row">
                     <div class="form-group">
-                        <label>מחיר (₪) *</label>
+                        <label>מחיר (₪)</label>
                         <input type="number" id="product-price" step="0.01" min="0" required>
                     </div>
-                    
                     <div class="form-group">
-                        <label>מלאי *</label>
+                        <label>מלאי</label>
                         <input type="number" id="product-stock" min="0" required>
                     </div>
                 </div>
-                
+
                 <div class="form-row">
                     <div class="form-group">
-                        <label>מקסימום קנייה בפעם *</label>
+                        <label>מקסימום לקנייה</label>
                         <input type="number" id="product-max-purchase" min="1" value="1" required>
                     </div>
-                    
                     <div class="form-group">
                         <label>הנחת VIP (%)</label>
                         <input type="number" id="product-discount" min="0" max="100" value="0">
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label>קישור לתמונה</label>
-                    <input type="url" id="product-image">
+                    <input type="url" id="product-image" placeholder="https://...">
                 </div>
-                
+
                 <div class="modal-actions">
                     <button type="submit" class="btn-primary">שמור</button>
                     <button type="button" class="btn-secondary" onclick="closeProductModal()">ביטול</button>
@@ -141,7 +140,7 @@
                 products = await response.json();
                 displayProducts();
             } catch (error) {
-                console.error('Error loading products:', error);
+                console.error(error);
             }
         }
 
@@ -151,30 +150,27 @@
                 purchases = await response.json();
                 displayPurchases();
             } catch (error) {
-                console.error('Error loading purchases:', error);
+                console.error(error);
             }
         }
 
         function displayProducts() {
             const tbody = document.getElementById('products-tbody');
-            
             if (products.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8">אין מוצרים</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">אין מוצרים</td></tr>';
                 return;
             }
-            
-            tbody.innerHTML = products.map(product => `
+            tbody.innerHTML = products.map(p => `
                 <tr>
-                    <td>${product.id}</td>
-                    <td>${product.name}</td>
-                    <td>${product.description || '-'}</td>
-                    <td>₪${product.price.toFixed(2)}</td>
-                    <td>${product.stock}</td>
-                    <td>${product.max_purchase}</td>
-                    <td>${product.discount_vip}%</td>
+                    <td>${p.id}</td>
+                    <td style="color: var(--text-primary); font-weight: 500;">${p.name}</td>
+                    <td>₪${p.price.toFixed(2)}</td>
+                    <td>${p.stock}</td>
+                    <td>${p.max_purchase}</td>
+                    <td>${p.discount_vip}%</td>
                     <td>
-                        <button class="btn-small" onclick="editProduct(${product.id})">✏️ ערוך</button>
-                        <button class="btn-small btn-danger" onclick="deleteProduct(${product.id})">🗑️ מחק</button>
+                        <button class="btn-small" onclick="editProduct(${p.id})">ערוך</button>
+                        <button class="btn-small btn-danger" onclick="deleteProduct(${p.id})">מחק</button>
                     </td>
                 </tr>
             `).join('');
@@ -182,60 +178,49 @@
 
         function displayPurchases() {
             const tbody = document.getElementById('purchases-tbody');
-            
             if (purchases.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7">אין קניות</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--text-muted);">אין קניות</td></tr>';
                 return;
             }
-            
-            tbody.innerHTML = purchases.map(purchase => `
+            tbody.innerHTML = purchases.map(p => `
                 <tr>
-                    <td>${purchase.id}</td>
-                    <td>${purchase.username}</td>
-                    <td>${purchase.product_name}</td>
-                    <td>${purchase.quantity}</td>
-                    <td>₪${purchase.total_price.toFixed(2)}</td>
-                    <td>${new Date(purchase.purchased_at).toLocaleString('he-IL')}</td>
-                    <td>${purchase.ticket_channel_id ? '✅' : '❌'}</td>
+                    <td>${p.id}</td>
+                    <td style="color: var(--text-primary);">${p.username}</td>
+                    <td>${p.product_name}</td>
+                    <td>${p.quantity}</td>
+                    <td>₪${p.total_price.toFixed(2)}</td>
+                    <td>${new Date(p.purchased_at).toLocaleString('he-IL')}</td>
+                    <td>${p.ticket_channel_id ? '✓' : '—'}</td>
                 </tr>
             `).join('');
         }
 
-        function showTab(tab) {
-            // Hide all tabs
+        function showTab(tab, btn) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            
-            // Show selected tab
             document.getElementById(tab + '-tab').classList.add('active');
-            event.target.classList.add('active');
-            
-            // Load data if needed
-            if (tab === 'purchases' && purchases.length === 0) {
-                loadPurchases();
-            }
+            btn.classList.add('active');
+            if (tab === 'purchases' && purchases.length === 0) loadPurchases();
         }
 
         function openProductModal(productId = null) {
             editingProductId = productId;
-            
             if (productId) {
-                const product = products.find(p => p.id === productId);
+                const p = products.find(x => x.id === productId);
                 document.getElementById('modal-title').textContent = 'עריכת מוצר';
-                document.getElementById('product-id').value = product.id;
-                document.getElementById('product-name').value = product.name;
-                document.getElementById('product-description').value = product.description || '';
-                document.getElementById('product-price').value = product.price;
-                document.getElementById('product-stock').value = product.stock;
-                document.getElementById('product-max-purchase').value = product.max_purchase;
-                document.getElementById('product-discount').value = product.discount_vip;
-                document.getElementById('product-image').value = product.image_url || '';
+                document.getElementById('product-id').value = p.id;
+                document.getElementById('product-name').value = p.name;
+                document.getElementById('product-description').value = p.description || '';
+                document.getElementById('product-price').value = p.price;
+                document.getElementById('product-stock').value = p.stock;
+                document.getElementById('product-max-purchase').value = p.max_purchase;
+                document.getElementById('product-discount').value = p.discount_vip;
+                document.getElementById('product-image').value = p.image_url || '';
             } else {
-                document.getElementById('modal-title').textContent = 'הוסף מוצר חדש';
+                document.getElementById('modal-title').textContent = 'הוסף מוצר';
                 document.getElementById('product-form').reset();
                 document.getElementById('product-id').value = '';
             }
-            
             document.getElementById('product-modal').style.display = 'block';
         }
 
@@ -246,8 +231,7 @@
 
         async function saveProduct(event) {
             event.preventDefault();
-            
-            const productData = {
+            const data = {
                 name: document.getElementById('product-name').value,
                 description: document.getElementById('product-description').value,
                 price: document.getElementById('product-price').value,
@@ -256,71 +240,44 @@
                 discount_vip: document.getElementById('product-discount').value,
                 image_url: document.getElementById('product-image').value,
             };
-            
+
             try {
-                let response;
-                if (editingProductId) {
-                    response = await fetch(`/api/admin/products/${editingProductId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(productData)
-                    });
-                } else {
-                    response = await fetch('/api/admin/products', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(productData)
-                    });
-                }
-                
+                const url = editingProductId ? `/api/admin/products/${editingProductId}` : '/api/admin/products';
+                const method = editingProductId ? 'PUT' : 'POST';
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
                 if (response.ok) {
-                    alert('✅ המוצר נשמר בהצלחה!');
                     closeProductModal();
                     loadProducts();
                 } else {
-                    alert('❌ שגיאה בשמירת המוצר');
+                    alert('שגיאה בשמירה');
                 }
             } catch (error) {
-                alert('❌ שגיאה בשמירת המוצר');
-                console.error(error);
+                alert('שגיאה בשמירה');
             }
         }
 
-        function editProduct(productId) {
-            openProductModal(productId);
-        }
+        function editProduct(id) { openProductModal(id); }
 
-        async function deleteProduct(productId) {
-            if (!confirm('האם אתה בטוח שברצונך למחוק את המוצר?')) {
-                return;
-            }
-            
+        async function deleteProduct(id) {
+            if (!confirm('למחוק את המוצר?')) return;
             try {
-                const response = await fetch(`/api/admin/products/${productId}`, {
-                    method: 'DELETE'
-                });
-                
-                if (response.ok) {
-                    alert('✅ המוצר נמחק בהצלחה!');
-                    loadProducts();
-                } else {
-                    alert('❌ שגיאה במחיקת המוצר');
-                }
+                const response = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' });
+                if (response.ok) loadProducts();
+                else alert('שגיאה במחיקה');
             } catch (error) {
-                alert('❌ שגיאה במחיקת המוצר');
-                console.error(error);
+                alert('שגיאה במחיקה');
             }
         }
 
-        // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('product-modal');
-            if (event.target == modal) {
-                closeProductModal();
-            }
+            if (event.target == document.getElementById('product-modal')) closeProductModal();
         }
 
-        // Load products on page load
         loadProducts();
     </script>
 </body>
